@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TODO App</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 24px;
+      color: #1a1a2e;
+    }
+
+    .input-area {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 1rem;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-area input:focus {
+      border-color: #4a90d9;
+    }
+
+    .input-area button {
+      padding: 12px 24px;
+      font-size: 1rem;
+      background: #4a90d9;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+
+    .input-area button:hover {
+      background: #357abd;
+    }
+
+    .todo-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      padding: 12px 16px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      transition: box-shadow 0.2s;
+    }
+
+    .todo-item:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    }
+
+    .todo-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      accent-color: #4a90d9;
+      flex-shrink: 0;
+    }
+
+    .todo-item .text {
+      flex: 1;
+      font-size: 1rem;
+      word-break: break-word;
+    }
+
+    .todo-item.completed .text {
+      text-decoration: line-through;
+      color: #999;
+    }
+
+    .todo-item .delete-btn {
+      background: none;
+      border: none;
+      color: #ccc;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .todo-item .delete-btn:hover {
+      color: #e74c3c;
+      background: #ffeaea;
+    }
+
+    .empty-message {
+      text-align: center;
+      color: #aaa;
+      margin-top: 40px;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TODO</h1>
+    <div class="input-area">
+      <input type="text" id="todo-input" placeholder="新しいTODOを入力...">
+      <button id="add-btn">追加</button>
+    </div>
+    <ul class="todo-list" id="todo-list"></ul>
+  </div>
+
+  <script>
+    const input = document.getElementById('todo-input');
+    const addBtn = document.getElementById('add-btn');
+    const list = document.getElementById('todo-list');
+
+    async function fetchTodos() {
+      const res = await fetch('/api/todos');
+      const todos = await res.json();
+      renderTodos(todos);
+    }
+
+    function renderTodos(todos) {
+      if (todos.length === 0) {
+        list.innerHTML = '<p class="empty-message">TODOはまだありません</p>';
+        return;
+      }
+      list.innerHTML = todos.map(todo => `
+        <li class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}">
+          <input type="checkbox" ${todo.completed ? 'checked' : ''}>
+          <span class="text">${escapeHTML(todo.text)}</span>
+          <button class="delete-btn" title="削除">&times;</button>
+        </li>
+      `).join('');
+    }
+
+    function escapeHTML(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    async function addTodo() {
+      const text = input.value.trim();
+      if (!text) return;
+      await fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      input.value = '';
+      fetchTodos();
+    }
+
+    addBtn.addEventListener('click', addTodo);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') addTodo();
+    });
+
+    list.addEventListener('click', async e => {
+      const item = e.target.closest('.todo-item');
+      if (!item) return;
+      const id = item.dataset.id;
+
+      if (e.target.type === 'checkbox') {
+        await fetch(`/api/todos/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ completed: e.target.checked }),
+        });
+        fetchTodos();
+      }
+
+      if (e.target.classList.contains('delete-btn')) {
+        await fetch(`/api/todos/${id}`, { method: 'DELETE' });
+        fetchTodos();
+      }
+    });
+
+    fetchTodos();
+  </script>
+</body>
+</html>
